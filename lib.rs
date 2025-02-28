@@ -5,7 +5,7 @@ mod vesting {
 
     #[ink(storage)]
     pub struct VestingContract {
-        realeasable_balance: Balance,
+        releasable_balance: Balance,
         released_balance: Balance,
         duration_time: Timestamp,
         start_time: Timestamp,
@@ -17,6 +17,7 @@ mod vesting {
     //and error when the realeasble balance is zero
     #[derive(Debug, PartialEq, Eq)]
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[allow(clippy::cast_possible_truncation)]
     pub enum Error {
         InvalidBenificiary,
         ZeroReleasbleBalance,
@@ -61,6 +62,7 @@ mod vesting {
                 duration_time,
                 start_time,
                 benificiary,
+                owner,
                 releasable_balance,
                 released_balance,
             })
@@ -98,7 +100,7 @@ mod vesting {
         //returns the time at which point vesting ends
         #[ink(message)]
         pub fn end_time(&self) -> Timestamp {
-            self.start_time().checked_add(self.duration_time()).unwarap()
+            self.start_time().checked_add(self.duration_time()).unwrap()
         }
 
         //returns the amount of time that remain until the end of vesting period
@@ -136,7 +138,7 @@ mod vesting {
         //wallet address, no matter who trigger the release
         #[ink(message)]
         pub fn release(&mut self) -> Result<(), Error> {
-            let releaseble = self.realeasable_balance();
+            let releaseble = self.releasable_balance();
             if releaseble == 0 {
                 return Err(Error::ZeroReleasbleBalance)
             }
@@ -144,12 +146,12 @@ mod vesting {
             self.released_balance = 
                 self.released_balance.checked_add(releaseble).unwrap();
             self.env()
-                .transfer(self.benificiary, realeasble)
-                .expect("Transfer faild during release")
+                .transfer(self.benificiary, releaseble)
+                .expect("Transfer faild during release");
 
             self.env().emit_event(Released {
-                value; releaseble,
-                to: self.benficiary,
+                value: releaseble,
+                to: self.benificiary,
             });
 
             Ok(())
@@ -177,7 +179,7 @@ mod vesting {
         //If the vesting duration is 200 seconds and 100 seconds have
         //passed since the start time, then 50% of the total_allocation
         //would have vested.
-        pb fn vesting_schedule(
+        pub fn vesting_schedule(
             &self,
             total_allocation: Balance,
             current_time: Timestamp,
